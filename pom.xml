@@ -81,6 +81,17 @@
 		<artifactId>pdfbox</artifactId>
 		<version>3.0.8</version>
 	</dependency>
+		<dependency>
+		<groupId>me.paulschwarz</groupId>
+		<artifactId>springboot4-dotenv</artifactId>
+		<version>5.1.0</version>
+		<optional>true</optional>
+	</dependency>
+	<dependency>
+		<groupId>dev.langchain4j</groupId>
+		<artifactId>langchain4j-qdrant</artifactId>
+		<version>1.18.1-beta28</version>
+	</dependency>
 	</dependencies>
 
 	<build>

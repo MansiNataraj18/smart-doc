@@ -7,6 +7,9 @@ target/
 
 .env
 
+# Qdrant local data
+qdrant_data/
+
 ### STS ###
 .apt_generated
 .classpath

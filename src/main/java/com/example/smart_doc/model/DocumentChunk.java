@@ -11,4 +11,5 @@ public class DocumentChunk {
     private String section;        
     private Integer chunkIndex;   
     private String text;           
+    private float[] embedding;
 }
