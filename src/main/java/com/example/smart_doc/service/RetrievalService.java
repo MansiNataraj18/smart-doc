@@ -1,9 +1,13 @@
 package com.example.smart_doc.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.example.smart_doc.model.RetrievedChunk;
+
+import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
@@ -25,6 +29,8 @@ public class RetrievalService {
         this.embeddingStore = embeddingStore;
     }
 
+    // Used internally by AnswerService (needs the raw LangChain4j
+    // match objects to build the prompt + citations).
     public List<EmbeddingMatch<TextSegment>> search(String question) {
 
         // 1. Generate embedding for the user's question
@@ -45,5 +51,36 @@ public class RetrievalService {
 
         // 4. Return the matching chunks
         return result.matches();
+    }
+
+    // Used by the /documents/search debug endpoint. EmbeddingMatch's
+    // accessor methods (score(), embedded()...) don't follow the
+    // getX() naming Jackson expects, so returning it directly from
+    // a controller serializes to "{}". This converts each match into
+    // RetrievedChunk, which has normal getters/setters, so the JSON
+    // actually shows the text, metadata and score.
+    public List<RetrievedChunk> searchWithDetails(String question) {
+
+        List<EmbeddingMatch<TextSegment>> matches = search(question);
+
+        List<RetrievedChunk> retrievedChunks = new ArrayList<>();
+
+        for (EmbeddingMatch<TextSegment> match : matches) {
+
+            Metadata metadata = match.embedded().metadata();
+
+            RetrievedChunk retrievedChunk = new RetrievedChunk();
+
+            retrievedChunk.setText(match.embedded().text());
+            retrievedChunk.setScore(match.score());
+            retrievedChunk.setDocumentName(metadata.getString("documentName"));
+            retrievedChunk.setSection(metadata.getString("section"));
+            retrievedChunk.setPageNumber(metadata.getInteger("pageNumber"));
+            retrievedChunk.setChunkIndex(metadata.getInteger("chunkIndex"));
+
+            retrievedChunks.add(retrievedChunk);
+        }
+
+        return retrievedChunks;
     }
 }

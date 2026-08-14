@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.smart_doc.model.AnswerResponse;
 import com.example.smart_doc.model.DocumentChunk;
 import com.example.smart_doc.model.PageContent;
+import com.example.smart_doc.model.RetrievedChunk;
 import com.example.smart_doc.service.AnswerService;
 import com.example.smart_doc.service.ChunkingService;
 import com.example.smart_doc.service.DocumentService;
@@ -48,28 +49,35 @@ public class DocumentController {
         this.answerService = answerService;
     }
 
+    // Accepts one OR MORE PDFs at once. Each PDF is processed
+    // independently (extract -> chunk -> embed -> store), but they
+    // all land in the same Qdrant collection. "documentName" on
+    // each chunk is what keeps them distinguishable later.
     @PostMapping("/upload")
-    public String uploadDocument(
-            @RequestParam("file") MultipartFile file) {
+    public String uploadDocuments(
+            @RequestParam("files") MultipartFile[] files) {
 
-        // 1. Extract text from PDF
-        List<PageContent> pageContents =
-                documentService.processDocument(file);
+        for (MultipartFile file : files) {
 
-        // 2. Split extracted text into chunks
-        List<DocumentChunk> chunks =
-                chunkingService.chunkDocument(
-                        pageContents,
-                        file.getOriginalFilename()
-                );
+            // 1. Extract text from PDF
+            List<PageContent> pageContents =
+                    documentService.processDocument(file);
 
-        // 3. Generate embeddings for every chunk
-        embeddingService.generateEmbeddings(chunks);
+            // 2. Split extracted text into chunks
+            List<DocumentChunk> chunks =
+                    chunkingService.chunkDocument(
+                            pageContents,
+                            file.getOriginalFilename()
+                    );
 
-        // 4. Store chunks + embeddings in Qdrant
-        qdrantService.storeChunks(chunks);
+            // 3. Generate embeddings for every chunk
+            embeddingService.generateEmbeddings(chunks);
 
-        return "Document uploaded and stored successfully";
+            // 4. Store chunks + embeddings in Qdrant
+            qdrantService.storeChunks(chunks);
+        }
+
+        return "Documents uploaded and stored successfully";
     }
 
     @PostMapping("/test-embedding")
@@ -82,11 +90,15 @@ public class DocumentController {
     // Temporary endpoint to test retrieval on its own, before we
     // wire in the LLM. Given a question, this returns the top
     // matching chunks straight from Qdrant -- no answer generation yet.
+    // Uses RetrievedChunk (not the raw LangChain4j match objects) so
+    // the JSON response actually shows the text/metadata/score --
+    // EmbeddingMatch's getters don't follow Jackson's naming rules
+    // and serialize to empty "{}" otherwise.
     @PostMapping("/search")
-    public List<EmbeddingMatch<TextSegment>> search(
+    public List<RetrievedChunk> search(
             @RequestParam("text") String text) {
 
-        return retrievalService.search(text);
+        return retrievalService.searchWithDetails(text);
     }
 
     // The full RAG pipeline: embed the question, search Qdrant for
