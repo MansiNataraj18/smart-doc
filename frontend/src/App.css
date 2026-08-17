@@ -17,7 +17,7 @@ html, body, #root {
   width: 220px;
   flex-shrink: 0;
   height: 100%;
-  background-color: #202123;
+  background-color: #0a0a0a;
   display: flex;
   flex-direction: column;
   padding: 20px 0;
@@ -46,7 +46,7 @@ html, body, #root {
   padding: 12px 20px;
   background: none;
   border: none;
-  color: #c5c5d2;
+  color: #a3a3a3;
   font-size: 14px;
   font-family: inherit;
   text-align: left;
@@ -76,7 +76,7 @@ html, body, #root {
   height: 100vh;
   display: flex;
   justify-content: center;
-  background-color: #f5f5f7;
+  background-color: #0e0e0e;
   overflow: hidden;
 }
 
@@ -89,8 +89,8 @@ html, body, #root {
   height: 100%;
   width: 100%;
   max-width: 800px;
-  background-color: #ffffff;
-  box-shadow: 0 0 24px rgba(0, 0, 0, 0.05);
+  background-color: #000000;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
 }
 
 /* Optional document filter, shown above the chat area only when
@@ -98,8 +98,8 @@ html, body, #root {
 
 .document-filter-bar {
   padding: 12px 24px;
-  border-bottom: 1px solid #e5e5e5;
-  background-color: #fafafa;
+  border-bottom: 1px solid #2a2a2a;
+  background-color: #0f0f0f;
 }
 
 .document-filter-header {
@@ -114,7 +114,7 @@ html, body, #root {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6e6e80;
+  color: #a3a3a3;
 }
 
 .document-filter-clear {
@@ -139,10 +139,10 @@ html, body, #root {
 
 .document-filter-chip {
   padding: 6px 12px;
-  border: 1px solid #d9d9e3;
+  border: 1px solid #2a2a2a;
   border-radius: 999px;
-  background-color: #ffffff;
-  color: #4d4d58;
+  background-color: #141414;
+  color: #f2f2f2;
   font-size: 13px;
   cursor: pointer;
   max-width: 220px;
@@ -165,7 +165,7 @@ html, body, #root {
 .document-filter-status {
   margin-top: 8px;
   font-size: 12px;
-  color: #8e8ea0;
+  color: #7a7a7a;
 }
 
 /* Documents page: a dedicated page for the upload card, instead of
@@ -195,17 +195,17 @@ html, body, #root {
   width: 100%;
   height: fit-content;
   padding: 24px;
-  background-color: #ffffff;
-  border: 1px solid #e5e5e5;
+  background-color: #141414;
+  border: 1px solid #2a2a2a;
   border-radius: 12px;
-  box-shadow: 0 0 24px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
 }
 
 .upload-title {
   margin: 0 0 10px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #202123;
+  color: #f2f2f2;
 }
 
 /* Uploaded Documents list -- session-only, not backed by a backend
@@ -214,22 +214,22 @@ html, body, #root {
 .documents-list-panel {
   width: 100%;
   padding: 24px;
-  background-color: #ffffff;
-  border: 1px solid #e5e5e5;
+  background-color: #141414;
+  border: 1px solid #2a2a2a;
   border-radius: 12px;
-  box-shadow: 0 0 24px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
 }
 
 .documents-list-title {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #202123;
+  color: #f2f2f2;
 }
 
 .documents-list-empty {
   font-size: 13px;
-  color: #8e8ea0;
+  color: #7a7a7a;
   padding: 8px 0;
 }
 
@@ -247,8 +247,8 @@ html, body, #root {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background-color: #fafafa;
-  border: 1px solid #ececec;
+  background-color: #0f0f0f;
+  border: 1px solid #2a2a2a;
   border-radius: 8px;
 }
 
@@ -261,7 +261,7 @@ html, body, #root {
   flex: 1;
   min-width: 0;
   font-size: 14px;
-  color: #202123;
+  color: #f2f2f2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -271,9 +271,9 @@ html, body, #root {
   flex-shrink: 0;
   font-size: 12px;
   font-weight: 600;
-  color: #0d8f6f;
-  background-color: #e6f6ef;
-  border: 1px solid #b8e6d3;
+  color: #4fd1a5;
+  background-color: #0f2a20;
+  border: 1px solid #1d4d3a;
   padding: 3px 8px;
   border-radius: 999px;
 }
@@ -306,10 +306,10 @@ html, body, #root {
 
 .upload-choose-button {
   padding: 10px 18px;
-  border: 1px solid #d9d9e3;
+  border: 1px solid #2a2a2a;
   border-radius: 10px;
-  background-color: #ffffff;
-  color: #202123;
+  background-color: #141414;
+  color: #f2f2f2;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -317,16 +317,16 @@ html, body, #root {
 }
 
 .upload-choose-button:hover {
-  background-color: #f5f5f7;
+  background-color: #1f1f1f;
 }
 
 .upload-choose-button-disabled {
-  color: #b4b4c0;
+  color: #4a4a4a;
   cursor: not-allowed;
 }
 
 .upload-choose-button-disabled:hover {
-  background-color: #ffffff;
+  background-color: #141414;
 }
 
 .upload-button {
@@ -346,7 +346,7 @@ html, body, #root {
 }
 
 .upload-button:disabled {
-  background-color: #c6e9df;
+  background-color: #1c4a3c;
   cursor: not-allowed;
 }
 
@@ -356,7 +356,7 @@ html, body, #root {
   margin: 10px 0 0 0;
   padding: 0;
   font-size: 13px;
-  color: #4d4d58;
+  color: #a3a3a3;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -383,7 +383,7 @@ html, body, #root {
   flex-shrink: 0;
   border: none;
   background: none;
-  color: #8e8ea0;
+  color: #7a7a7a;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
@@ -392,12 +392,12 @@ html, body, #root {
 }
 
 .upload-file-remove-button:hover:not(:disabled) {
-  color: #c0392b;
-  background-color: #fdeceb;
+  color: #ff8a80;
+  background-color: #2a1414;
 }
 
 .upload-file-remove-button:disabled {
-  color: #d0d0d8;
+  color: #3a3a3a;
   cursor: not-allowed;
 }
 
@@ -409,15 +409,15 @@ html, body, #root {
 }
 
 .upload-success {
-  background-color: #e6f6ef;
-  color: #0d8f6f;
-  border: 1px solid #b8e6d3;
+  background-color: #0f2a20;
+  color: #4fd1a5;
+  border: 1px solid #1d4d3a;
 }
 
 .upload-error {
-  background-color: #fdeceb;
-  color: #c0392b;
-  border: 1px solid #f5c6c2;
+  background-color: #2a1414;
+  color: #ff9186;
+  border: 1px solid #4d2323;
 }
 
 /* Chat area */
@@ -433,7 +433,7 @@ html, body, #root {
 
 .empty-state {
   margin: auto;
-  color: #8e8ea0;
+  color: #7a7a7a;
   font-size: 14px;
   text-align: center;
 }
@@ -470,8 +470,8 @@ html, body, #root {
 }
 
 .assistant-bubble {
-  background-color: #f0f0f3;
-  color: #202123;
+  background-color: #1a1a1a;
+  color: #f2f2f2;
   border-bottom-left-radius: 4px;
 }
 
@@ -490,7 +490,7 @@ html, body, #root {
 .sources-box {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .sources-title {
@@ -498,7 +498,7 @@ html, body, #root {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6e6e80;
+  color: #a3a3a3;
   margin-bottom: 6px;
 }
 
@@ -514,11 +514,11 @@ html, body, #root {
   flex-wrap: wrap;
   gap: 6px 10px;
   padding: 6px 10px;
-  background-color: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   font-size: 12.5px;
-  color: #4d4d58;
+  color: #a3a3a3;
 }
 
 .source-field {
@@ -528,12 +528,12 @@ html, body, #root {
 .source-field:not(:last-child)::after {
   content: "\2022";
   margin-left: 10px;
-  color: #b4b4c0;
+  color: #4a4a4a;
 }
 
 .source-document {
   font-weight: 600;
-  color: #202123;
+  color: #f2f2f2;
 }
 
 /* Loading indicator: three bouncing dots inside a bubble */
@@ -549,7 +549,7 @@ html, body, #root {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: #8e8ea0;
+  background-color: #7a7a7a;
   animation: bounce 1.2s infinite ease-in-out;
 }
 
@@ -579,16 +579,18 @@ html, body, #root {
   align-items: flex-end;
   gap: 10px;
   padding: 16px 24px;
-  border-top: 1px solid #e5e5e5;
-  background-color: #ffffff;
+  border-top: 1px solid #2a2a2a;
+  background-color: #000000;
 }
 
 .chat-input {
   flex: 1;
   resize: none;
   padding: 12px 14px;
-  border: 1px solid #d9d9e3;
+  border: 1px solid #2a2a2a;
   border-radius: 12px;
+  background-color: #141414;
+  color: #f2f2f2;
   font-size: 15px;
   font-family: inherit;
   max-height: 140px;
@@ -615,7 +617,7 @@ html, body, #root {
 }
 
 .send-button:disabled {
-  background-color: #c6e9df;
+  background-color: #1c4a3c;
   cursor: not-allowed;
 }
 
@@ -630,7 +632,7 @@ html, body, #root {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -640,17 +642,17 @@ html, body, #root {
 .confirm-dialog {
   width: 90%;
   max-width: 380px;
-  background-color: #ffffff;
+  background-color: #141414;
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .confirm-message {
   margin: 0 0 20px 0;
   font-size: 14px;
   line-height: 1.5;
-  color: #202123;
+  color: #f2f2f2;
 }
 
 .confirm-actions {
@@ -661,17 +663,17 @@ html, body, #root {
 
 .confirm-cancel-button {
   padding: 10px 18px;
-  border: 1px solid #d9d9e3;
+  border: 1px solid #2a2a2a;
   border-radius: 10px;
-  background-color: #ffffff;
-  color: #202123;
+  background-color: #141414;
+  color: #f2f2f2;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .confirm-cancel-button:hover {
-  background-color: #f5f5f7;
+  background-color: #1f1f1f;
 }
 
 .confirm-replace-button {
