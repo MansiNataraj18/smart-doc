@@ -32,6 +32,11 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
   // before uploading.
   const [duplicateNames, setDuplicateNames] = useState([]);
 
+  // How many of the files in THIS upload have finished (successfully
+  // or not) so far, e.g. { completed: 3, total: 10 }. null whenever
+  // an upload isn't in progress.
+  const [uploadProgress, setUploadProgress] = useState(null);
+
   const fileInputRef = useRef(null);
 
   function handleFileChange(event) {
@@ -87,36 +92,61 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
   // Actually sends the upload request. "replace" tells the backend
   // this was confirmed by the user as an intentional replacement of
   // an existing document (see api.js / DocumentController).
+  //
+  // Uploads the selected files ONE AT A TIME (instead of one request
+  // for the whole batch) purely so we can report real progress as
+  // each one finishes -- api.js's uploadDocuments() and the backend
+  // endpoint it calls are completely unchanged, this just calls that
+  // same function once per file. If one file fails, we record it and
+  // keep going with the rest, so a single bad file can't stop the
+  // remaining ones from uploading or freeze the progress count.
   async function performUpload(replace) {
     setIsUploading(true);
     setStatus(null);
 
-    try {
-      await uploadDocuments(selectedFiles, replace);
+    const total = selectedFiles.length;
+    setUploadProgress({ completed: 0, total });
 
-      setStatus({
-        type: "success",
-        message: `${selectedFiles.length} document(s) uploaded successfully.`,
-      });
+    let failedCount = 0;
 
-      // Re-fetch the persisted list from the backend now that the
-      // upload succeeded, instead of guessing what got saved --
-      // this is what keeps PostgreSQL as the single source of truth.
-      if (onDocumentsUploaded) {
-        await onDocumentsUploaded();
+    for (let index = 0; index < selectedFiles.length; index++) {
+      try {
+        await uploadDocuments([selectedFiles[index]], replace);
+      } catch (error) {
+        failedCount += 1;
+        console.error("Failed to upload documents:", error);
       }
 
+      setUploadProgress({ completed: index + 1, total });
+    }
+
+    setUploadProgress(null);
+
+    // Re-fetch the persisted list from the backend now that the
+    // upload attempt is done, instead of guessing what got saved --
+    // this is what keeps PostgreSQL as the single source of truth.
+    // Done regardless of failures, since some files may have
+    // succeeded before/around a failed one.
+    if (onDocumentsUploaded) {
+      await onDocumentsUploaded();
+    }
+
+    if (failedCount === 0) {
+      setStatus({
+        type: "success",
+        message: `${total} document(s) uploaded successfully.`,
+      });
+
       resetSelection();
-    } catch (error) {
+    } else {
       setStatus({
         type: "error",
         message:
           "Upload failed. Please check that the backend is running and try again.",
       });
-      console.error("Failed to upload documents:", error);
-    } finally {
-      setIsUploading(false);
     }
+
+    setIsUploading(false);
   }
 
   function handleUploadClick() {
@@ -218,7 +248,11 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
             onClick={handleUploadClick}
             disabled={isUploading || selectedFiles.length === 0}
           >
-            {isUploading ? "Uploading..." : "Upload"}
+            {isUploading
+              ? uploadProgress
+                ? `Uploading ${uploadProgress.completed} of ${uploadProgress.total}...`
+                : "Uploading..."
+              : "Upload"}
           </button>
         </div>
 
