@@ -9,6 +9,7 @@ import com.example.smart_doc.model.DocumentChunk;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 
+/** Turns text into embedding vectors via the {@link EmbeddingModel} bean. */
 @Service
 public class EmbeddingService {
 
@@ -18,7 +19,7 @@ public class EmbeddingService {
         this.embeddingModel = embeddingModel;
     }
 
-    // Generate embedding for a single piece of text
+    /** Generates the embedding vector for one piece of text. */
     public float[] generateEmbedding(String text) {
 
         Embedding embedding = embeddingModel.embed(text).content();
@@ -26,7 +27,7 @@ public class EmbeddingService {
         return embedding.vector();
     }
 
-    // Generate embeddings for all document chunks
+    /** Generates and sets an embedding on every chunk in the list. */
     public void generateEmbeddings(List<DocumentChunk> chunks) {
 
         for (DocumentChunk chunk : chunks) {

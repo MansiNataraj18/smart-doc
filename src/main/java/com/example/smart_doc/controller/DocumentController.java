@@ -29,6 +29,7 @@ import com.example.smart_doc.service.RetrievalService;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 
+/** The single HTTP entry point into the SmartDoc backend: upload, list, delete, ask. */
 @RestController
 @RequestMapping("/documents")
 public class DocumentController {
@@ -59,36 +60,10 @@ public class DocumentController {
         this.documentMetadataService = documentMetadataService;
     }
 
-    // Accepts one OR MORE PDFs at once. Each PDF is processed
-    // independently (extract -> chunk -> embed -> store), but they
-    // all land in the same Qdrant collection. "documentName" on
-    // each chunk is what keeps them distinguishable later.
-    //
-    // NEW: once a file's chunks are successfully stored in Qdrant, we
-    // persist a small metadata row for it in PostgreSQL (name + when
-    // uploaded). This is what lets the Documents page and the Chat
-    // page's document selector survive a browser refresh or a
-    // restart -- they now read from the database instead of
-    // in-memory frontend state.
-    //
-    // If extraction/chunking/embedding/Qdrant storage fails for a
-    // file, this method throws before reaching the metadata-save
-    // step for that file, so nothing gets persisted for it -- exactly
-    // the "don't record documents that failed to ingest" behavior
-    // that was asked for.
-    // "replace" is OPTIONAL and defaults to false. The frontend sets
-    // it to true only after the user has confirmed, via the
-    // "already exists, replace it?" dialog, that this upload should
-    // replace an existing document with the same name. We don't need
-    // it for the PostgreSQL metadata row -- saveOrUpdate() already
-    // updates the existing row by documentName instead of creating a
-    // duplicate, regardless of this flag. It's captured here so the
-    // flag genuinely reaches the backend end-to-end (rather than
-    // being a frontend-only illusion of a confirmation), and so the
-    // response can tell the caller a replacement was acknowledged.
-    // Actually removing the OLD chunks for this document from Qdrant
-    // (so re-uploads don't leave duplicate vectors behind) is a
-    // separate follow-up step -- not done here yet.
+    /**
+     * Uploads and ingests one or more PDFs: extract, chunk, embed, store in Qdrant,
+     * then save metadata in PostgreSQL. {@code replace} just flags a confirmed re-upload.
+     */
     @PostMapping("/upload")
     public String uploadDocuments(
             @RequestParam("files") MultipartFile[] files,
@@ -155,27 +130,13 @@ public class DocumentController {
                 + String.join("; ", metadataWarnings);
     }
 
-    // The persisted list of uploaded documents (from PostgreSQL, not
-    // frontend state). The Documents page and the Chat page's
-    // document selector both read from this.
+    /** Lists every persisted document, most recently uploaded first. */
     @GetMapping
     public List<DocumentEntity> listDocuments() {
         return documentMetadataService.listAll();
     }
 
-    // Deletes an already-uploaded document completely: its chunks
-    // and vectors in Qdrant AND its metadata row in PostgreSQL. This
-    // is what powers the "X" next to a document in the Documents
-    // page -- it's a real deletion, not just hiding the row in the
-    // frontend, so a deleted document can never come back as a
-    // retrieval result.
-    //
-    // Qdrant is deleted FIRST, then PostgreSQL. If the Qdrant delete
-    // fails, we throw before touching PostgreSQL, so the document
-    // stays fully intact (and still shown in the UI) rather than
-    // ending up in a half-deleted state. If either step fails, the
-    // caller gets a 500 response and the frontend keeps the document
-    // in the list, exactly as required.
+    /** Deletes a document's chunks in Qdrant and its metadata row in PostgreSQL. */
     @DeleteMapping
     public String deleteDocument(
             @RequestParam("documentName") String documentName) {
@@ -193,6 +154,7 @@ public class DocumentController {
         return "Document deleted successfully";
     }
 
+    /** Debug endpoint: embeds text and returns the raw vector. */
     @PostMapping("/test-embedding")
     public float[] testEmbedding(
             @RequestParam("text") String text) {
@@ -200,13 +162,7 @@ public class DocumentController {
         return embeddingService.generateEmbedding(text);
     }
 
-    // Temporary endpoint to test retrieval on its own, before we
-    // wire in the LLM. Given a question, this returns the top
-    // matching chunks straight from Qdrant -- no answer generation yet.
-    // Uses RetrievedChunk (not the raw LangChain4j match objects) so
-    // the JSON response actually shows the text/metadata/score --
-    // EmbeddingMatch's getters don't follow Jackson's naming rules
-    // and serialize to empty "{}" otherwise.
+    /** Debug endpoint: searches Qdrant and returns matching chunks, without generating an answer. */
     @PostMapping("/search")
     public List<RetrievedChunk> search(
             @RequestParam("text") String text) {
@@ -214,17 +170,7 @@ public class DocumentController {
         return retrievalService.searchWithDetails(text);
     }
 
-    // The full RAG pipeline: embed the question, search Qdrant for
-    // the most relevant chunks, then ask the chat model to write an
-    // answer using only those chunks -- and return the source
-    // citations (document/page/chunk) alongside the answer.
-    //
-    // "documents" is OPTIONAL. If the caller doesn't send it (exactly
-    // like every request before this feature existed), it comes in
-    // as null, RetrievalService treats that as "search everything",
-    // and behavior is 100% unchanged. If the caller sends one or more
-    // "documents" values, only chunks from those documents are
-    // searched.
+    /** Full RAG pipeline: retrieves relevant chunks, then generates a cited answer. */
     @PostMapping("/ask")
     public AnswerResponse ask(
             @RequestParam("text") String question,

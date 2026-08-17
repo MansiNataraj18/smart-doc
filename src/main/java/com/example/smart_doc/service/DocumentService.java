@@ -13,12 +13,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.smart_doc.model.PageContent;
 
+/** Extracts text from an uploaded PDF, one page at a time. */
 @Service
 public class DocumentService {
 
+    /** Reads a PDF and returns its text, one {@link PageContent} per page. */
     public List<PageContent> processDocument(MultipartFile file) {
-
-        //StringBuilder result = new StringBuilder();
 
         List<PageContent> pageContents = new ArrayList<>();
 

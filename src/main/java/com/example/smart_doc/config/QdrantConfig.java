@@ -5,9 +5,11 @@ import org.springframework.context.annotation.Configuration;
 
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 
+/** Connects to the local Qdrant vector database. */
 @Configuration
 public class QdrantConfig {
 
+    /** Builds the Qdrant embedding store bean. */
     @Bean
     public QdrantEmbeddingStore qdrantEmbeddingStore() {
 

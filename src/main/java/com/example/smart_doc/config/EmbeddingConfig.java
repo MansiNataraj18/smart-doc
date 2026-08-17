@@ -7,9 +7,11 @@ import org.springframework.core.env.Environment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 
+/** Creates the {@link EmbeddingModel} bean used to turn text into vectors. */
 @Configuration
 public class EmbeddingConfig {
 
+    /** Builds the OpenAI text-embedding-3-small embedding model bean. */
     @Bean
     public EmbeddingModel embeddingModel(Environment environment) {
 

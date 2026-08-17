@@ -7,9 +7,11 @@ import org.springframework.core.env.Environment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 
+/** Creates the {@link ChatModel} bean used to generate answers. */
 @Configuration
 public class ChatModelConfig {
 
+    /** Builds the OpenAI gpt-4o-mini chat model bean. */
     @Bean
     public ChatModel chatModel(Environment environment) {
 

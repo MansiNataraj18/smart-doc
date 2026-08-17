@@ -13,13 +13,7 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-// This is the ONE new persistent thing this feature adds: a row per
-// uploaded PDF, so the Documents page and the Chat page's document
-// selector both have something to read that survives a page refresh
-// or a restart. It intentionally does NOT store chunks, embeddings,
-// or text -- that all still lives in Qdrant exactly as before. This
-// table only answers "which documents exist", nothing more.
-
+/** A "this document exists" row in PostgreSQL -- name + upload time only, no chunks/text. */
 @Entity
 @Table(
         name = "documents",
@@ -29,16 +23,20 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class DocumentEntity {
 
+    /** Primary key. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** The uploaded file's name; unique so re-uploads update, not duplicate. */
     @Column(name = "document_name", nullable = false, unique = true)
     private String documentName;
 
+    /** When this document was last (re)uploaded. */
     @Column(name = "uploaded_at", nullable = false)
     private LocalDateTime uploadedAt;
 
+    /** Creates a new document record. */
     public DocumentEntity(String documentName, LocalDateTime uploadedAt) {
         this.documentName = documentName;
         this.uploadedAt = uploadedAt;

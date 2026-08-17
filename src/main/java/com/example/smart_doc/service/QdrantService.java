@@ -12,6 +12,7 @@ import dev.langchain4j.store.embedding.filter.Filter;
 import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 
+/** Stores and removes document chunk vectors in Qdrant. */
 @Service
 public class QdrantService {
 
@@ -21,6 +22,7 @@ public class QdrantService {
         this.embeddingStore = embeddingStore;
     }
 
+    /** Stores each chunk's embedding vector and metadata in Qdrant. */
     public void storeChunks(List<DocumentChunk> chunks) {
 
         for (DocumentChunk chunk : chunks) {
@@ -60,13 +62,7 @@ public class QdrantService {
         }
     }
 
-    // Removes every chunk/vector belonging to one document, using the
-    // SAME "documentName" metadata field every chunk is stored with
-    // in storeChunks() above -- this is what RetrievalService already
-    // filters on for document selection, so re-using it here means
-    // deletion and search stay in sync automatically. Used by the
-    // DELETE /documents endpoint so a removed document can never be
-    // returned by retrieval again.
+    /** Removes every chunk/vector belonging to one document. */
     public void deleteByDocumentName(String documentName) {
 
         Filter documentFilter =

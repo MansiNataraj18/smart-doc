@@ -2,18 +2,25 @@ package com.example.smart_doc.model;
 
 import lombok.Data;
 
-// This is what we hand back after searching Qdrant.
-// It looks a lot like DocumentChunk, but it also carries a "score"
-// (how close this chunk is to the question) and it does NOT carry
-// the embedding itself -- we don't need the raw vector once search is done.
-
+/** A single search result from Qdrant, shaped for JSON (used by the debug /search endpoint). */
 @Data
 public class RetrievedChunk {
 
+    /** Name of the document this chunk came from. */
     private String documentName;
+
+    /** Page number this chunk came from. */
     private Integer pageNumber;
+
+    /** Optional section/heading label. */
     private String section;
+
+    /** Position of this chunk within its document. */
     private Integer chunkIndex;
+
+    /** The chunk's text. */
     private String text;
+
+    /** Similarity score; higher means more relevant. */
     private double score;
 }

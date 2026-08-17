@@ -13,12 +13,7 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 
-// This service takes a question + the chunks we already retrieved
-// from Qdrant, and asks the chat model to write an answer using
-// ONLY those chunks. It now also builds the source citations, so
-// the caller knows exactly which document/page/chunk the answer
-// came from.
-
+/** Turns retrieved chunks into a written, cited answer (the "G" in RAG). */
 @Service
 public class AnswerService {
 
@@ -28,6 +23,7 @@ public class AnswerService {
         this.chatModel = chatModel;
     }
 
+    /** Generates an answer grounded only in the given chunks, plus its citations. */
     public AnswerResponse generateAnswer(
             String question,
             List<EmbeddingMatch<TextSegment>> matches) {
@@ -50,6 +46,7 @@ public class AnswerService {
         return new AnswerResponse(answer, sources);
     }
 
+    /** Joins the retrieved chunks' text into one block, to use as the model's context. */
     private String buildContext(List<EmbeddingMatch<TextSegment>> matches) {
 
         StringBuilder context = new StringBuilder();
@@ -63,6 +60,7 @@ public class AnswerService {
         return context.toString();
     }
 
+    /** Builds the prompt sent to the chat model: instructions + context + question. */
     private String buildPrompt(String context, String question) {
 
         return """
@@ -87,6 +85,7 @@ public class AnswerService {
                 """.formatted(context, question);
     }
 
+    /** Builds one citation per chunk that has complete metadata. */
     private List<SourceCitation> buildSources(
             List<EmbeddingMatch<TextSegment>> matches) {
 

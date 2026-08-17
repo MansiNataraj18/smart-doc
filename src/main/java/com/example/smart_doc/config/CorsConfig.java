@@ -4,18 +4,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-// This exists ONLY to fix CORS -- it does not touch any RAG logic
-// or the /documents/ask contract.
-//
-// Why this is needed: the browser blocks the React app (running on
-// http://localhost:5173) from calling this backend (running on
-// http://localhost:8080) because they are different "origins".
-// Spring Boot does not allow cross-origin requests by default, so
-// we have to explicitly say "requests from the frontend are okay".
-
+/** Allows the React frontend (localhost:5173) to call this backend. */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
+    /** Registers the CORS rule for the Vite dev server. */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
 
