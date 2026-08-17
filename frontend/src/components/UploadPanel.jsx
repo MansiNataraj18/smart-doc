@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { uploadDocuments } from "../api";
+import { uploadDocuments, deleteDocument } from "../api";
 import ConfirmDialog from "./ConfirmDialog";
 
 // A self-contained "Upload Documents" section. It manages its own
@@ -36,6 +36,17 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
   // or not) so far, e.g. { completed: 3, total: 10 }. null whenever
   // an upload isn't in progress.
   const [uploadProgress, setUploadProgress] = useState(null);
+
+  // Name of an already-uploaded document the user has clicked the X
+  // on, waiting on the "are you sure?" confirmation. null means no
+  // delete confirmation is showing. Kept completely separate from
+  // duplicateNames above, so this never touches the upload/duplicate
+  // flow.
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+
+  // True only while the DELETE request for documentToDelete is in
+  // flight, so the X buttons can be disabled to prevent double-clicks.
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -194,6 +205,51 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     performUpload(true);
   }
 
+  // Clicking the X next to an already-uploaded document just asks
+  // for confirmation first -- nothing is deleted yet.
+  function handleDeleteClick(documentName) {
+    setDocumentToDelete(documentName);
+  }
+
+  // "No" -- close the confirmation, leave the document exactly as it
+  // was, no backend call made.
+  function handleCancelDelete() {
+    setDocumentToDelete(null);
+  }
+
+  // "Yes" -- actually delete the document. The backend removes it
+  // from BOTH Qdrant and PostgreSQL (see DocumentController.deleteDocument).
+  // Only re-fetch the list (so it disappears from view) if the delete
+  // actually succeeded -- on failure the document stays exactly where
+  // it was.
+  async function handleConfirmDelete() {
+    const nameToDelete = documentToDelete;
+    setIsDeleting(true);
+
+    try {
+      await deleteDocument(nameToDelete);
+      setDocumentToDelete(null);
+
+      if (onDocumentsUploaded) {
+        await onDocumentsUploaded();
+      }
+
+      setStatus({
+        type: "success",
+        message: `"${nameToDelete}" was deleted.`,
+      });
+    } catch (error) {
+      console.error("Failed to delete document:", error);
+      setDocumentToDelete(null);
+      setStatus({
+        type: "error",
+        message: `Failed to delete "${nameToDelete}". Please try again.`,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const duplicateMessage =
     duplicateNames.length === 1
       ? `A file named "${duplicateNames[0]}" already exists. Do you want to replace it?`
@@ -301,6 +357,16 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
                 <span className="document-icon">📄</span>
                 <span className="document-name">{document.name}</span>
                 <span className="document-status">{document.status}</span>
+                <button
+                  type="button"
+                  className="document-remove-button"
+                  onClick={() => handleDeleteClick(document.name)}
+                  disabled={isDeleting}
+                  title={`Delete ${document.name}`}
+                  aria-label={`Delete ${document.name}`}
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>
@@ -314,6 +380,16 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
           cancelLabel="Cancel"
           onConfirm={handleConfirmReplace}
           onCancel={handleCancelReplace}
+        />
+      )}
+
+      {documentToDelete && (
+        <ConfirmDialog
+          message={`Are you sure you want to delete "${documentToDelete}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
         />
       )}
     </div>
