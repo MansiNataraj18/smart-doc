@@ -1,6 +1,7 @@
 package com.example.smart_doc.service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -13,6 +14,8 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
+import dev.langchain4j.store.embedding.filter.Filter;
+import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 
 @Service
@@ -29,21 +32,50 @@ public class RetrievalService {
         this.embeddingStore = embeddingStore;
     }
 
-    // Used internally by AnswerService (needs the raw LangChain4j
-    // match objects to build the prompt + citations).
+    // Kept exactly as before, for anything that doesn't care about
+    // document filtering (the /documents/search debug endpoint).
+    // Internally this now just calls the new overload with "no
+    // documents selected", which means "search everything" -- so
+    // behavior here is unchanged.
     public List<EmbeddingMatch<TextSegment>> search(String question) {
+        return search(question, null);
+    }
+
+    // Same as search(question), but optionally restricted to only
+    // the given document names.
+    //
+    // - documentNames == null or empty -> search ALL documents,
+    //   exactly like before this feature existed.
+    // - documentNames has entries -> Qdrant itself only looks at
+    //   chunks whose "documentName" payload field is one of these,
+    //   using the SAME metadata field ChunkingService/QdrantService
+    //   already store on every chunk. This is a filter applied
+    //   during the vector search, not a manual filter afterward.
+    public List<EmbeddingMatch<TextSegment>> search(
+            String question,
+            List<String> documentNames) {
 
         // 1. Generate embedding for the user's question
         var questionEmbedding =
                 embeddingModel.embed(question).content();
 
-        // 2. Create search request
-        EmbeddingSearchRequest request =
-                EmbeddingSearchRequest.builder()
-                        .queryEmbedding(questionEmbedding)
-                        .maxResults(3)
-                        .minScore(0.0)
-                        .build();
+        // 2. Create search request, adding a document filter only
+        // if the user actually selected documents
+        var requestBuilder = EmbeddingSearchRequest.builder()
+                .queryEmbedding(questionEmbedding)
+                .maxResults(3)
+                .minScore(0.0);
+
+        if (documentNames != null && !documentNames.isEmpty()) {
+
+            Filter documentFilter =
+                    MetadataFilterBuilder.metadataKey("documentName")
+                            .isIn(new HashSet<>(documentNames));
+
+            requestBuilder.filter(documentFilter);
+        }
+
+        EmbeddingSearchRequest request = requestBuilder.build();
 
         // 3. Search Qdrant
         EmbeddingSearchResult<TextSegment> result =
@@ -58,7 +90,7 @@ public class RetrievalService {
     // getX() naming Jackson expects, so returning it directly from
     // a controller serializes to "{}". This converts each match into
     // RetrievedChunk, which has normal getters/setters, so the JSON
-    // actually shows the text, metadata and score.
+    // actually shows the text/metadata/score.
     public List<RetrievedChunk> searchWithDetails(String question) {
 
         List<EmbeddingMatch<TextSegment>> matches = search(question);

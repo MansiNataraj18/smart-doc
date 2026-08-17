@@ -7,13 +7,27 @@ const BASE_URL = "http://localhost:8080";
 // Calls POST /documents/ask with the user's question and returns
 // { answer, sources } -- exactly what AnswerResponse looks like on
 // the backend.
-export async function askQuestion(question) {
+//
+// selectedDocuments is OPTIONAL. Leave it out (or pass an empty
+// array) to search across every uploaded document, exactly like
+// before this feature existed. Pass one or more document names to
+// restrict retrieval to just those documents -- each name is sent
+// as its own "documents" field, matching the backend's
+// @RequestParam(value = "documents", required = false) List<String>.
+export async function askQuestion(question, selectedDocuments = []) {
+  const params = new URLSearchParams();
+  params.append("text", question);
+
+  for (const documentName of selectedDocuments) {
+    params.append("documents", documentName);
+  }
+
   const response = await fetch(`${BASE_URL}/documents/ask`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ text: question }),
+    body: params,
   });
 
   if (!response.ok) {
@@ -28,12 +42,20 @@ export async function askQuestion(question) {
 // "files" (see @RequestParam("files") MultipartFile[] files),
 // so we append each file under that same key rather than giving
 // each one a unique key.
-export async function uploadDocuments(files) {
+//
+// "replace" is OPTIONAL and defaults to false. Set it to true only
+// after the user has explicitly confirmed (via the "already exists,
+// replace it?" dialog) that this upload should replace an existing
+// document of the same name -- see UploadPanel.jsx. The backend
+// receives this as a "replace" form field.
+export async function uploadDocuments(files, replace = false) {
   const formData = new FormData();
 
   for (const file of files) {
     formData.append("files", file);
   }
+
+  formData.append("replace", replace);
 
   const response = await fetch(`${BASE_URL}/documents/upload`, {
     method: "POST",
@@ -48,5 +70,42 @@ export async function uploadDocuments(files) {
   }
 
   // The backend returns a plain text message here, not JSON.
+  return response.text();
+}
+
+// Calls GET /documents and returns the persisted list of uploaded
+// documents: [{ id, documentName, uploadedAt }, ...]. This is the
+// source of truth for "what documents exist" -- it comes from
+// PostgreSQL on the backend, not from anything kept in the browser,
+// so it's still correct after a page refresh or a restart.
+export async function getDocuments() {
+  const response = await fetch(`${BASE_URL}/documents`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Server responded with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// Calls DELETE /documents?documentName=... to remove an
+// already-uploaded document. On the backend this removes BOTH the
+// persisted PostgreSQL metadata row AND the document's chunks/vectors
+// in Qdrant, so this is a real deletion -- not just a frontend-only
+// removal from the list. See UploadPanel.jsx's X button.
+export async function deleteDocument(documentName) {
+  const params = new URLSearchParams();
+  params.append("documentName", documentName);
+
+  const response = await fetch(`${BASE_URL}/documents?${params.toString()}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Server responded with status ${response.status}`);
+  }
+
   return response.text();
 }

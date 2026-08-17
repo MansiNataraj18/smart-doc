@@ -7,3 +7,15 @@ services:
       - "6334:6334"
     volumes:
       - ./qdrant_data:/qdrant/storage
+
+  postgres:
+    image: postgres:16
+    container_name: smartdoc-postgres
+    environment:
+      POSTGRES_DB: smartdoc
+      POSTGRES_USER: smartdoc
+      POSTGRES_PASSWORD: smartdoc
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
