@@ -9,6 +9,7 @@ target/
 
 # Qdrant local data
 qdrant_data/
+postgres_data/
 
 ### STS ###
 .apt_generated
