@@ -18,6 +18,11 @@ public class DocumentMetadataService {
         this.documentRepository = documentRepository;
     }
 
+    /** Checks whether a document with this exact name has already been uploaded. */
+    public boolean exists(String documentName) {
+        return documentRepository.findByDocumentName(documentName).isPresent();
+    }
+
     /** Saves a new document, or updates its timestamp if it already exists. */
     public DocumentEntity saveOrUpdate(String documentName) {
 

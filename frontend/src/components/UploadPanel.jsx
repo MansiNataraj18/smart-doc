@@ -2,59 +2,68 @@ import { useRef, useState } from "react";
 import { uploadDocuments, deleteDocument } from "../api";
 import ConfirmDialog from "./ConfirmDialog";
 
-// A self-contained "Upload Documents" section. It manages its own
-// state for the upload flow (selected files, loading, status
-// message, and now the duplicate-confirmation step) and does not
-// touch anything related to the chat -- it just calls the existing
-// /documents/upload endpoint through api.js.
+// This component is the "Upload Documents" section. Its only job is
+// UI: show which files are picked, show progress, show success/error
+// messages, and show the "replace?" / "delete?" popups.
+//
+// It does a quick, friendly check on the file name/type just so the
+// user gets instant feedback instead of waiting for a round trip to
+// the server. That check is NOT the real security check -- it's easy
+// to fool (just rename any file to end in ".pdf"). The backend
+// (DocumentService.isPdfFile) always re-checks the file's actual
+// bytes before doing anything with it, so it never trusts this quick
+// frontend check alone.
+//
+// It also does NOT decide whether a file is a duplicate. That's a
+// business decision, so the backend (DocumentController) makes it.
+// This component just sends files to the backend and displays
+// whatever the backend says happened.
 //
 // "uploadedDocuments" is the persisted list (from GET /documents,
-// backed by PostgreSQL) passed down from App.jsx, so the Chat page
-// can also see which documents are available to filter by. After a
-// successful upload, this component calls onDocumentsUploaded()
-// (rather than editing the list itself) so App.jsx re-fetches the
-// real list from the backend -- keeping the database the single
-// source of truth instead of guessing what got saved.
-//
-// This same "uploadedDocuments" list is also what we use to detect
-// duplicate filenames before uploading -- no new endpoint needed,
-// just reusing the list that's already fetched.
+// backed by PostgreSQL) passed down from App.jsx. After an upload or
+// delete, this component calls onDocumentsUploaded() so App.jsx
+// re-fetches the real list from the backend, instead of guessing
+// what changed.
 
 function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
+  // The files the user has picked but not uploaded yet
   const [selectedFiles, setSelectedFiles] = useState([]);
+
+  // True while an upload request is in flight
   const [isUploading, setIsUploading] = useState(false);
 
-  // status: { type: "success" | "error", message: string } | null
+  // The message shown at the bottom of the upload box, e.g.
+  // { type: "success" | "error", message: "..." }
   const [status, setStatus] = useState(null);
 
-  // Filenames from the CURRENT selection that already exist in
-  // uploadedDocuments. Non-empty means the confirm dialog is shown
-  // before uploading.
+  // Names of files the backend told us already exist. Non-empty
+  // means we show the "replace it?" popup.
   const [duplicateNames, setDuplicateNames] = useState([]);
 
-  // How many of the files in THIS upload have finished (successfully
-  // or not) so far, e.g. { completed: 3, total: 10 }. null whenever
-  // an upload isn't in progress.
+  // Progress while uploading, e.g. { completed: 2, total: 5 }
   const [uploadProgress, setUploadProgress] = useState(null);
 
-  // Name of an already-uploaded document the user has clicked the X
-  // on, waiting on the "are you sure?" confirmation. null means no
-  // delete confirmation is showing. Kept completely separate from
-  // duplicateNames above, so this never touches the upload/duplicate
-  // flow.
+  // Name of a document the user clicked the delete (×) button on.
+  // We wait for the user to confirm before actually deleting it.
   const [documentToDelete, setDocumentToDelete] = useState(null);
 
-  // True only while the DELETE request for documentToDelete is in
-  // flight, so the X buttons can be disabled to prevent double-clicks.
+  // True while a delete request is in flight
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Lets us clear the native file input after an upload
   const fileInputRef = useRef(null);
 
+  // Called when the user picks files with the file dialog.
+  //
+  // We do a quick check here -- by file name/type -- just to give the
+  // user instant feedback instead of making them wait for an upload
+  // attempt to find out. This is ONLY a convenience: it's easy to
+  // fake (rename any file to end in ".pdf"), so the backend always
+  // does the real check on the file's actual content before storing
+  // anything.
   function handleFileChange(event) {
     const chosenFiles = Array.from(event.target.files);
 
-    // Only allow PDFs, even though the file picker is already
-    // filtered to PDFs -- some browsers/OSes let users override that.
     const pdfFiles = chosenFiles.filter(
       (file) =>
         file.type === "application/pdf" ||
@@ -71,61 +80,65 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     }
 
     setSelectedFiles(pdfFiles);
-    // A fresh selection always needs to be re-checked -- clear any
-    // stale duplicate/confirmation state from a previous selection.
+
+    // A fresh selection always needs to be re-checked by the
+    // backend -- clear any stale duplicate/confirmation state left
+    // over from a previous selection.
     setDuplicateNames([]);
   }
 
+  // Clears the selected files and resets the file input, so the
+  // upload box goes back to its empty state.
   function resetSelection() {
     setSelectedFiles([]);
     setDuplicateNames([]);
 
-    // Clears the native file input too, so the same file can be
-    // re-selected later if needed.
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }
 
-  // Removes ONE file from the current pending selection (before
-  // anything is uploaded) -- e.g. the user picked the wrong PDF and
-  // wants to drop just that one without clearing the whole
-  // selection. This only touches local component state: nothing is
-  // sent to the backend, so PostgreSQL/Qdrant are never involved,
-  // and it has no effect on the duplicate-warning flow (that's only
-  // triggered later, on the Upload button click).
+  // Removes one file from the pending selection before uploading.
+  // Nothing is sent to the backend here -- this only changes what's
+  // shown on screen.
   function handleRemovePendingFile(indexToRemove) {
     setSelectedFiles((previousFiles) =>
       previousFiles.filter((_, index) => index !== indexToRemove)
     );
   }
 
-  // Actually sends the upload request. "replace" tells the backend
-  // this was confirmed by the user as an intentional replacement of
-  // an existing document (see api.js / DocumentController).
+  // Uploads a list of files, one at a time, and shows a progress
+  // message as each one finishes. "replace" tells the backend the
+  // user has confirmed it's OK to overwrite an existing document.
   //
-  // Uploads the selected files ONE AT A TIME (instead of one request
-  // for the whole batch) purely so we can report real progress as
-  // each one finishes -- api.js's uploadDocuments() and the backend
-  // endpoint it calls are completely unchanged, this just calls that
-  // same function once per file. If one file fails, we record it and
-  // keep going with the rest, so a single bad file can't stop the
-  // remaining ones from uploading or freeze the progress count.
-  async function performUpload(replace) {
+  // For every file, the backend sends back a status: "success",
+  // "duplicate", "invalid" (not a real PDF), or "error". This
+  // function just collects those results and turns them into what
+  // the user sees -- it doesn't make any of those decisions itself.
+  async function performUpload(filesToUpload, replace) {
     setIsUploading(true);
     setStatus(null);
 
-    const total = selectedFiles.length;
+    const total = filesToUpload.length;
     setUploadProgress({ completed: 0, total });
 
-    let failedCount = 0;
+    const allResults = [];
 
-    for (let index = 0; index < selectedFiles.length; index++) {
+    for (let index = 0; index < filesToUpload.length; index++) {
       try {
-        await uploadDocuments([selectedFiles[index]], replace);
+        const resultsForThisFile = await uploadDocuments(
+          [filesToUpload[index]],
+          replace
+        );
+        allResults.push(...resultsForThisFile);
       } catch (error) {
-        failedCount += 1;
-        console.error("Failed to upload documents:", error);
+        // The request itself failed (e.g. backend is down)
+        allResults.push({
+          fileName: filesToUpload[index].name,
+          status: "error",
+          message: "Could not reach the server.",
+        });
+        console.error("Failed to upload document:", error);
       }
 
       setUploadProgress({ completed: index + 1, total });
@@ -134,32 +147,45 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     setUploadProgress(null);
 
     // Re-fetch the persisted list from the backend now that the
-    // upload attempt is done, instead of guessing what got saved --
-    // this is what keeps PostgreSQL as the single source of truth.
-    // Done regardless of failures, since some files may have
-    // succeeded before/around a failed one.
+    // upload attempt is done, instead of guessing what got saved.
     if (onDocumentsUploaded) {
       await onDocumentsUploaded();
     }
 
-    if (failedCount === 0) {
-      setStatus({
-        type: "success",
-        message: `${total} document(s) uploaded successfully.`,
-      });
+    // Sort the backend's results into the three things we show on screen
+    const duplicates = allResults.filter((result) => result.status === "duplicate");
+    const failures = allResults.filter(
+      (result) => result.status === "invalid" || result.status === "error"
+    );
+    const successes = allResults.filter((result) => result.status === "success");
 
-      resetSelection();
+    if (duplicates.length > 0) {
+      // Ask the user whether to replace these specific files
+      setDuplicateNames(duplicates.map((result) => result.fileName));
     } else {
+      resetSelection();
+    }
+
+    if (failures.length > 0) {
+      const details = failures
+        .map((result) => `${result.fileName} (${result.message})`)
+        .join("; ");
+
       setStatus({
         type: "error",
-        message:
-          "Upload failed. Please check that the backend is running and try again.",
+        message: `${failures.length} file(s) could not be uploaded: ${details}`,
+      });
+    } else if (successes.length > 0 && duplicates.length === 0) {
+      setStatus({
+        type: "success",
+        message: `${successes.length} document(s) uploaded successfully.`,
       });
     }
 
     setIsUploading(false);
   }
 
+  // Called when the user clicks the "Upload" button.
   function handleUploadClick() {
     if (selectedFiles.length === 0) {
       setStatus({
@@ -169,59 +195,41 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
       return;
     }
 
-    // Compare the selected filenames against the already-persisted
-    // documents list (from GET /documents / PostgreSQL) instead of
-    // adding a new backend check -- the list we already have is the
-    // right source of truth for "does this document already exist".
-    const existingNames = new Set(
-      (uploadedDocuments || []).map((document) => document.name)
-    );
-
-    const duplicates = selectedFiles
-      .map((file) => file.name)
-      .filter((name) => existingNames.has(name));
-
-    if (duplicates.length > 0) {
-      // Don't upload yet -- ask for confirmation first.
-      setDuplicateNames(duplicates);
-      return;
-    }
-
-    performUpload(false);
+    performUpload(selectedFiles, false);
   }
 
+  // "Cancel" on the replace popup -- don't replace anything, just
+  // close the popup and clear the pending selection.
   function handleCancelReplace() {
-    // "Do not send the upload request. Keep the existing document
-    // unchanged." -- close the dialog AND discard the pending
-    // selection that triggered it (same cleanup as resetSelection:
-    // clears selectedFiles, duplicateNames, and the native file
-    // input), so the upload area immediately goes back to its empty
-    // state instead of leaving the just-rejected file sitting there.
+    setDuplicateNames([]);
     resetSelection();
   }
 
+  // "Replace" on the replace popup -- re-upload just the file(s) the
+  // backend flagged as duplicates, this time with replace=true.
   function handleConfirmReplace() {
+    const filesToReplace = selectedFiles.filter((file) =>
+      duplicateNames.includes(file.name)
+    );
+
     setDuplicateNames([]);
-    performUpload(true);
+    performUpload(filesToReplace, true);
   }
 
-  // Clicking the X next to an already-uploaded document just asks
+  // Clicking the × next to an already-uploaded document just asks
   // for confirmation first -- nothing is deleted yet.
   function handleDeleteClick(documentName) {
     setDocumentToDelete(documentName);
   }
 
-  // "No" -- close the confirmation, leave the document exactly as it
-  // was, no backend call made.
+  // "No" -- close the confirmation, nothing is deleted.
   function handleCancelDelete() {
     setDocumentToDelete(null);
   }
 
   // "Yes" -- actually delete the document. The backend removes it
-  // from BOTH Qdrant and PostgreSQL (see DocumentController.deleteDocument).
-  // Only re-fetch the list (so it disappears from view) if the delete
-  // actually succeeded -- on failure the document stays exactly where
-  // it was.
+  // from both Qdrant and PostgreSQL. Only refresh the list if the
+  // delete actually succeeded.
   async function handleConfirmDelete() {
     const nameToDelete = documentToDelete;
     setIsDeleting(true);

@@ -18,6 +18,7 @@ import com.example.smart_doc.model.DocumentChunk;
 import com.example.smart_doc.model.DocumentEntity;
 import com.example.smart_doc.model.PageContent;
 import com.example.smart_doc.model.RetrievedChunk;
+import com.example.smart_doc.model.UploadResult;
 import com.example.smart_doc.service.AnswerService;
 import com.example.smart_doc.service.ChunkingService;
 import com.example.smart_doc.service.DocumentMetadataService;
@@ -61,73 +62,114 @@ public class DocumentController {
     }
 
     /**
-     * Uploads and ingests one or more PDFs: extract, chunk, embed, store in Qdrant,
-     * then save metadata in PostgreSQL. {@code replace} just flags a confirmed re-upload.
+     * Uploads and ingests one or more PDFs: validate, check for a
+     * duplicate name, then extract/chunk/embed/store in Qdrant, and
+     * finally save metadata in PostgreSQL.
+     *
+     * Every decision (is this really a PDF? does it already exist?
+     * did it succeed?) is made HERE on the backend. The frontend does
+     * not validate or decide anything -- it only shows whatever
+     * {@link UploadResult} we return for each file.
+     *
+     * One file's problem never stops the others: each file gets its
+     * own result, and a failure on file 2 still lets files 1 and 3
+     * finish normally.
      */
     @PostMapping("/upload")
-    public String uploadDocuments(
+    public List<UploadResult> uploadDocuments(
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(value = "replace", defaultValue = "false") boolean replace) {
 
-        // Collects one warning per file ONLY if Qdrant ingestion
-        // succeeded but saving the PostgreSQL metadata row afterward
-        // failed -- see the comment further down for why this is
-        // handled separately from ingestion failures.
-        List<String> metadataWarnings = new ArrayList<>();
+        List<UploadResult> results = new ArrayList<>();
 
         for (MultipartFile file : files) {
+            results.add(uploadSingleFile(file, replace));
+        }
 
-            // 1. Extract text from PDF
+        return results;
+    }
+
+    /** Validates, checks for duplicates, and ingests exactly one file. */
+    private UploadResult uploadSingleFile(MultipartFile file, boolean replace) {
+
+        String fileName = file.getOriginalFilename();
+
+        // 1. Reject anything that isn't really a PDF -- checked from
+        // the file's actual bytes, not its name or browser-reported type.
+        if (!documentService.isPdfFile(file)) {
+            return new UploadResult(
+                    fileName,
+                    "invalid",
+                    "This file is not a valid PDF."
+            );
+        }
+
+        // 2. If a document with this name already exists and the
+        // caller hasn't confirmed a replace, stop here -- the
+        // frontend will show a "replace it?" dialog and try again
+        // with replace=true if the user confirms.
+        boolean alreadyExists = documentMetadataService.exists(fileName);
+
+        if (alreadyExists && !replace) {
+            return new UploadResult(
+                    fileName,
+                    "duplicate",
+                    "A document named \"" + fileName + "\" already exists."
+            );
+        }
+
+        try {
+            // 3. Extract text from PDF
             List<PageContent> pageContents =
                     documentService.processDocument(file);
 
-            // 2. Split extracted text into chunks
+            // 4. Split extracted text into chunks
             List<DocumentChunk> chunks =
-                    chunkingService.chunkDocument(
-                            pageContents,
-                            file.getOriginalFilename()
-                    );
+                    chunkingService.chunkDocument(pageContents, fileName);
 
-            // 3. Generate embeddings for every chunk
+            // 5. Generate embeddings for every chunk
             embeddingService.generateEmbeddings(chunks);
 
-            // 4. Store chunks + embeddings in Qdrant
+            // 6. Store chunks + embeddings in Qdrant
             qdrantService.storeChunks(chunks);
 
-            // 5. Only NOW that Qdrant ingestion has actually
-            // succeeded, persist the document's metadata.
-            //
-            // This can fail independently of everything above (e.g.
-            // PostgreSQL is briefly unreachable). If it does, the
-            // document is still fully searchable in Qdrant -- it
-            // just won't show up in the Documents list or be
-            // selectable as a filter until this succeeds (on a
-            // re-upload, or once the database is reachable again).
-            // We don't roll back the Qdrant write and we don't fail
-            // the whole request for this -- that would require a
-            // distributed transaction across two different
-            // datastores, which is unnecessary complexity for this
-            // project. We just surface it clearly instead of staying
-            // silent about it.
-            try {
-                documentMetadataService.saveOrUpdate(file.getOriginalFilename());
-            } catch (Exception exception) {
-                metadataWarnings.add(
-                        file.getOriginalFilename()
-                                + " (indexed, but not saved to the documents list: "
-                                + exception.getMessage() + ")"
-                );
-            }
+        } catch (Exception exception) {
+            return new UploadResult(
+                    fileName,
+                    "error",
+                    "Failed to process \"" + fileName + "\": " + exception.getMessage()
+            );
         }
 
-        String prefix = replace ? "Replace confirmed. " : "";
-
-        if (metadataWarnings.isEmpty()) {
-            return prefix + "Documents uploaded and stored successfully";
+        // 7. Only NOW that Qdrant ingestion has actually succeeded,
+        // persist the document's metadata.
+        //
+        // This can fail independently of everything above (e.g.
+        // PostgreSQL is briefly unreachable). If it does, the
+        // document is still fully searchable in Qdrant -- it just
+        // won't show up in the Documents list or be selectable as a
+        // filter until this succeeds (on a re-upload, or once the
+        // database is reachable again). We don't roll back the
+        // Qdrant write and we don't fail the whole request for this
+        // -- that would require a distributed transaction across two
+        // different datastores, which is unnecessary complexity for
+        // this project. We just surface it clearly instead of
+        // staying silent about it.
+        try {
+            documentMetadataService.saveOrUpdate(fileName);
+        } catch (Exception exception) {
+            return new UploadResult(
+                    fileName,
+                    "success",
+                    "Indexed, but not saved to the documents list: " + exception.getMessage()
+            );
         }
 
-        return prefix + "Documents uploaded and stored successfully. Warnings: "
-                + String.join("; ", metadataWarnings);
+        String message = (replace && alreadyExists)
+                ? "Replaced successfully."
+                : "Uploaded and stored successfully.";
+
+        return new UploadResult(fileName, "success", message);
     }
 
     /** Lists every persisted document, most recently uploaded first. */

@@ -2,6 +2,7 @@ package com.example.smart_doc.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,6 +17,34 @@ import com.example.smart_doc.model.PageContent;
 /** Extracts text from an uploaded PDF, one page at a time. */
 @Service
 public class DocumentService {
+
+    /** Every real PDF file starts with these 5 bytes. */
+    private static final String PDF_SIGNATURE = "%PDF-";
+
+    /**
+     * Checks the file's actual bytes (not its name or the browser-reported
+     * type, both of which are easy to fake) to confirm it's really a PDF.
+     * This is the ONLY place PDF-ness is decided -- the frontend just
+     * displays whatever this method (via the controller) reports back.
+     */
+    public boolean isPdfFile(MultipartFile file) {
+
+        try (InputStream inputStream = file.getInputStream()) {
+
+            byte[] header = new byte[PDF_SIGNATURE.length()];
+            int bytesRead = inputStream.read(header);
+
+            if (bytesRead < PDF_SIGNATURE.length()) {
+                return false;
+            }
+
+            String signature = new String(header, StandardCharsets.US_ASCII);
+            return signature.equals(PDF_SIGNATURE);
+
+        } catch (IOException e) {
+            return false;
+        }
+    }
 
     /** Reads a PDF and returns its text, one {@link PageContent} per page. */
     public List<PageContent> processDocument(MultipartFile file) {

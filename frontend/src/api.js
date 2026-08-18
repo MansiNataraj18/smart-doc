@@ -48,6 +48,13 @@ export async function askQuestion(question, selectedDocuments = []) {
 // replace it?" dialog) that this upload should replace an existing
 // document of the same name -- see UploadPanel.jsx. The backend
 // receives this as a "replace" form field.
+//
+// The backend decides EVERYTHING about each file -- whether it's
+// really a PDF, whether it's a duplicate, and whether it succeeded --
+// and returns one result per file, e.g.
+//   [{ fileName, status: "success" | "duplicate" | "invalid" | "error", message }]
+// This function just returns that list as-is; it doesn't inspect or
+// judge the files itself.
 export async function uploadDocuments(files, replace = false) {
   const formData = new FormData();
 
@@ -69,8 +76,7 @@ export async function uploadDocuments(files, replace = false) {
     throw new Error(`Server responded with status ${response.status}`);
   }
 
-  // The backend returns a plain text message here, not JSON.
-  return response.text();
+  return response.json();
 }
 
 // Calls GET /documents and returns the persisted list of uploaded
