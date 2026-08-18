@@ -50,10 +50,16 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
   // True while a delete request is in flight
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // True while the user is dragging a file over the drop area --
+  // only used to show/hide the highlighted drop-zone border.
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
   // Lets us clear the native file input after an upload
   const fileInputRef = useRef(null);
 
-  // Called when the user picks files with the file dialog.
+  // Shared by BOTH the "Choose Files" picker and drag-and-drop, so
+  // there's only one place that decides what happens with newly
+  // picked files, no matter how they were picked.
   //
   // We do a quick check here -- by file name/type -- just to give the
   // user instant feedback instead of making them wait for an upload
@@ -61,9 +67,7 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
   // fake (rename any file to end in ".pdf"), so the backend always
   // does the real check on the file's actual content before storing
   // anything.
-  function handleFileChange(event) {
-    const chosenFiles = Array.from(event.target.files);
-
+  function addSelectedFiles(chosenFiles) {
     const pdfFiles = chosenFiles.filter(
       (file) =>
         file.type === "application/pdf" ||
@@ -85,6 +89,42 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     // backend -- clear any stale duplicate/confirmation state left
     // over from a previous selection.
     setDuplicateNames([]);
+  }
+
+  // Called when the user picks files with the file dialog.
+  function handleFileChange(event) {
+    addSelectedFiles(Array.from(event.target.files));
+  }
+
+  // Called continuously while a file is being dragged over the drop
+  // area. Preventing the default behavior is what tells the browser
+  // "yes, dropping here is allowed" -- without it, onDrop never fires.
+  function handleDragOver(event) {
+    event.preventDefault();
+
+    if (!isUploading) {
+      setIsDraggingOver(true);
+    }
+  }
+
+  // The drag left the drop area (or the user dropped elsewhere) --
+  // just turn off the highlighted border.
+  function handleDragLeave() {
+    setIsDraggingOver(false);
+  }
+
+  // The user actually dropped file(s) onto the drop area. This uses
+  // the exact same addSelectedFiles() function as picking files the
+  // normal way, so dropped files go through the same PDF check.
+  function handleDrop(event) {
+    event.preventDefault();
+    setIsDraggingOver(false);
+
+    if (isUploading) {
+      return;
+    }
+
+    addSelectedFiles(Array.from(event.dataTransfer.files));
   }
 
   // Clears the selected files and resets the file input, so the
@@ -270,54 +310,72 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
       <section className="upload-panel">
         <h2 className="upload-title">Upload Documents</h2>
 
-        <div className="upload-controls">
-          {/* The native <input type="file"> shows its OWN chosen-file
-              text right next to the button (that's browser chrome,
-              not something we render) -- and there's no way to make
-              it forget just one file when a single pending file is
-              removed below. So instead of showing the raw input, we
-              hide it and trigger it from our own "Choose Files"
-              label. The list below (driven entirely by our
-              "selectedFiles" state) becomes the ONE place selected
-              files are shown, so there's no duplicate text and
-              removing a file there is the only place removing it
-              needs to happen. */}
-          <label
-            htmlFor="pdf-upload-input"
-            className={`upload-choose-button${
-              isUploading ? " upload-choose-button-disabled" : ""
-            }`}
-            onClick={(event) => {
-              if (isUploading) {
-                event.preventDefault();
-              }
-            }}
-          >
-            Choose Files
-          </label>
+        {/* Drag-and-drop area. Dropping files here calls the exact
+            same addSelectedFiles() function as the "Choose Files"
+            button, so both ways of picking a file behave identically.
+            The border just highlights while something is being
+            dragged over it -- it has no effect on what gets uploaded. */}
+        <div
+          className={`upload-dropzone${
+            isDraggingOver ? " upload-dropzone-active" : ""
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <p className="upload-dropzone-text">
+            Drag and drop PDF files here, or
+          </p>
 
-          <input
-            id="pdf-upload-input"
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,application/pdf"
-            multiple
-            onChange={handleFileChange}
-            disabled={isUploading}
-            className="upload-file-input-hidden"
-          />
+          <div className="upload-controls">
+            {/* The native <input type="file"> shows its OWN chosen-file
+                text right next to the button (that's browser chrome,
+                not something we render) -- and there's no way to make
+                it forget just one file when a single pending file is
+                removed below. So instead of showing the raw input, we
+                hide it and trigger it from our own "Choose Files"
+                label. The list below (driven entirely by our
+                "selectedFiles" state) becomes the ONE place selected
+                files are shown, so there's no duplicate text and
+                removing a file there is the only place removing it
+                needs to happen. */}
+            <label
+              htmlFor="pdf-upload-input"
+              className={`upload-choose-button${
+                isUploading ? " upload-choose-button-disabled" : ""
+              }`}
+              onClick={(event) => {
+                if (isUploading) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              Choose Files
+            </label>
 
-          <button
-            className="upload-button"
-            onClick={handleUploadClick}
-            disabled={isUploading || selectedFiles.length === 0}
-          >
-            {isUploading
-              ? uploadProgress
-                ? `Uploading ${uploadProgress.completed} of ${uploadProgress.total}...`
-                : "Uploading..."
-              : "Upload"}
-          </button>
+            <input
+              id="pdf-upload-input"
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              multiple
+              onChange={handleFileChange}
+              disabled={isUploading}
+              className="upload-file-input-hidden"
+            />
+
+            <button
+              className="upload-button"
+              onClick={handleUploadClick}
+              disabled={isUploading || selectedFiles.length === 0}
+            >
+              {isUploading
+                ? uploadProgress
+                  ? `Uploading ${uploadProgress.completed} of ${uploadProgress.total}...`
+                  : "Uploading..."
+                : "Upload"}
+            </button>
+          </div>
         </div>
 
         {selectedFiles.length > 0 && (
