@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -89,6 +91,26 @@ public class DocumentController {
         return results;
     }
 
+    /**
+     * Catches a file that's bigger than the 10 MB limit configured in
+     * application.properties. Without this, that would come back as a
+     * raw framework error instead of the same friendly per-file
+     * result the frontend already knows how to display.
+     *
+     * We don't know the offending file's name at this point (the
+     * size check happens while reading the upload, before we can
+     * inspect individual files), so the message just explains the
+     * limit rather than naming a specific file.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public List<UploadResult> handleFileTooLarge() {
+        return List.of(new UploadResult(
+                "Unknown file",
+                "error",
+                "This file is too large. The maximum allowed size is 10 MB."
+        ));
+    }
+
     /** Validates, checks for duplicates, and ingests exactly one file. */
     private UploadResult uploadSingleFile(MultipartFile file, boolean replace) {
 
@@ -122,6 +144,18 @@ public class DocumentController {
             // 3. Extract text from PDF
             List<PageContent> pageContents =
                     documentService.processDocument(file);
+
+            // 3b. Reject PDFs with nothing to actually search --
+            // usually a scanned/image-only PDF. Without this check,
+            // it would "succeed" but store zero chunks and zero
+            // embeddings, silently.
+            if (!documentService.hasExtractableText(pageContents)) {
+                return new UploadResult(
+                        fileName,
+                        "error",
+                        "This PDF has no extractable text (it may be a scanned or image-only PDF)."
+                );
+            }
 
             // 4. Split extracted text into chunks
             List<DocumentChunk> chunks =

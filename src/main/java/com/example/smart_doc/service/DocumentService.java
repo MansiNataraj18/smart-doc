@@ -46,6 +46,30 @@ public class DocumentService {
         }
     }
 
+    /**
+     * True if at least one page has some real (non-blank) text on it.
+     *
+     * A scanned/image-only PDF still passes the {@link #isPdfFile}
+     * check (it's a real PDF) but has nothing for PDFBox to extract,
+     * which would otherwise silently produce zero chunks and zero
+     * embeddings -- an upload that "succeeds" but is not searchable.
+     * This lets the caller catch that case and report it clearly
+     * instead of staying silent about it.
+     */
+    public boolean hasExtractableText(List<PageContent> pageContents) {
+
+        for (PageContent pageContent : pageContents) {
+
+            String text = pageContent.getText();
+
+            if (text != null && !text.isBlank()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Reads a PDF and returns its text, one {@link PageContent} per page. */
     public List<PageContent> processDocument(MultipartFile file) {
 
