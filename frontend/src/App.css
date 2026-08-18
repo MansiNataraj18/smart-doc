@@ -208,6 +208,21 @@ html, body, #root {
   color: #f2f2f2;
 }
 
+/* Informational-only heads-up about OCR's limits with diagrams --
+   yellow like a typical "warning" note, so it stands out a bit from
+   the app's normal muted secondary text. */
+
+.upload-ocr-warning {
+  margin: 0 0 14px 0;
+  padding: 8px 12px;
+  border: 1px solid #4d4020;
+  border-radius: 8px;
+  background-color: #2a2410;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e0c341;
+}
+
 /* Uploaded Documents list -- session-only, not backed by a backend
    "list documents" endpoint yet. */
 

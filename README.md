@@ -16,7 +16,9 @@ It's a full RAG (Retrieval-Augmented Generation) pipeline: PDF text extraction
 - OpenAI (`text-embedding-3-small` for embeddings, `gpt-4o-mini` for answers)
 - Qdrant — vector database that stores document chunk embeddings
 - PostgreSQL — stores document metadata (filename, upload time)
-- PDFBox — extracts text from uploaded PDFs
+- PDFBox — extracts text (and images) from uploaded PDFs
+- Tesseract (via Tess4J) — OCR, reads text out of images found in PDFs
+  (scanned pages, screenshots, diagrams)
 
 **Frontend**
 - React + Vite
@@ -24,9 +26,12 @@ It's a full RAG (Retrieval-Augmented Generation) pipeline: PDF text extraction
 
 ## How it works
 
-1. **Upload** — a PDF is uploaded, its text is extracted page by page, split
-   into overlapping chunks, embedded, and stored in Qdrant. The filename and
-   upload time are saved to PostgreSQL.
+1. **Upload** — a PDF is uploaded, its text is extracted page by page. Any
+   images on a page (a scanned page, a pasted screenshot, a diagram) also go
+   through OCR, and that text is added onto the page's normal text — so a
+   scanned PDF is searchable exactly like a normal one. The combined text is
+   split into overlapping chunks, embedded, and stored in Qdrant. The filename
+   and upload time are saved to PostgreSQL.
 2. **Ask** — a question is embedded and used to search Qdrant for the most
    relevant chunks (optionally restricted to specific documents you select).
    Those chunks are given to the chat model as context, which generates an
@@ -41,6 +46,15 @@ It's a full RAG (Retrieval-Augmented Generation) pipeline: PDF text extraction
 - Node.js (for the frontend)
 - Docker (to run Qdrant + PostgreSQL)
 - An OpenAI API key
+- Tesseract OCR installed locally (`brew install tesseract` on macOS,
+  `apt install tesseract-ocr` on Linux). This is a separate native program,
+  not something Maven can install — if the backend fails to start with
+  `UnsatisfiedLinkError: Unable to load library 'tesseract'`, it means this
+  step was skipped or the paths below don't match your machine.
+  `ocr.tessdata-path` and `ocr.native-library-path` in
+  `application.properties` point at where Tesseract's files ended up on
+  your machine — the defaults match a Homebrew install on Apple Silicon;
+  see the comments above those settings for other OSes.
 
 ## Setup
 
@@ -100,7 +114,7 @@ smart_doc/
 │   ├── controller/     DocumentController — the single HTTP entry point
 │   ├── model/          Plain data classes (chunks, citations, responses, etc.)
 │   ├── repository/     Spring Data JPA repository for document metadata
-│   └── service/        Extraction, chunking, embeddings, Qdrant, retrieval, answers
+│   └── service/        Extraction, OCR, chunking, embeddings, Qdrant, retrieval, answers
 ├── frontend/src/
 │   ├── components/     UploadPanel, ChatInput, ChatMessage, Sidebar, ConfirmDialog
 │   ├── pages/           ChatPage, DocumentsPage
@@ -124,6 +138,9 @@ smart_doc/
 
 - There's no authentication yet — every document is visible to everyone using
   the app.
+- OCR reads the words in an image but doesn't understand its structure —
+  for a flowchart or diagram, it can't tell you how the boxes/arrows relate
+  to each other, only what text appears in it.
 - The sandbox/CI environment used during development can't reach Maven
   Central, so backend changes are verified by manual review rather than an
   automated build — always run `./mvnw compile` yourself after pulling

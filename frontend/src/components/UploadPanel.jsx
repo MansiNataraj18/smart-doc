@@ -310,6 +310,17 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
       <section className="upload-panel">
         <h2 className="upload-title">Upload Documents</h2>
 
+        {/* Informational only -- OCR (reading text out of images/scans)
+            now runs on the backend for every uploaded PDF, but it can't
+            truly understand a diagram's structure, just the words in it.
+            This is just a heads-up for the user; it doesn't change
+            anything about how uploading works. */}
+        <p className="upload-ocr-warning">
+          Warning: If your PDF contains images such as flowcharts or
+          diagrams, OCR may not accurately understand the image
+          structure or relationships. Results may be inaccurate.
+        </p>
+
         {/* Drag-and-drop area. Dropping files here calls the exact
             same addSelectedFiles() function as the "Choose Files"
             button, so both ways of picking a file behave identically.
