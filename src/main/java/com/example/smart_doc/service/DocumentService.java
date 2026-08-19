@@ -67,9 +67,14 @@ public class DocumentService {
     /**
      * True if at least one page has some real (non-blank) text on it.
      *
-     * A scanned/image-only PDF still passes the {@link #isPdfFile}
-     * check (it's a real PDF) but has nothing for PDFBox to extract,
-     * which would otherwise silently produce zero chunks and zero
+     * By the time this runs, each page's text already includes both
+     * PDFBox's normal extraction AND any OCR text read from images on
+     * that page (see {@link #processDocument}) -- so a scanned/
+     * image-only PDF usually passes this check now too, as long as
+     * OCR could read something from it. This only catches the pages
+     * that still have nothing after both: a genuinely blank page, or
+     * an image OCR couldn't read any text from. Without this check,
+     * that case would otherwise silently produce zero chunks and zero
      * embeddings -- an upload that "succeeds" but is not searchable.
      * This lets the caller catch that case and report it clearly
      * instead of staying silent about it.
@@ -99,7 +104,20 @@ public class DocumentService {
         try (InputStream inputStream = file.getInputStream();
              PDDocument document = Loader.loadPDF(inputStream.readAllBytes())) {
 
-            PDFTextStripper pdfTextStripper = new PDFTextStripper();
+            // A plain PDFTextStripper doesn't mark paragraph breaks in
+            // its output by default. Overriding writeParagraphStart()
+            // lets us insert an extra blank line wherever PDFBox
+            // detects a new paragraph is starting (based on the gap
+            // between lines) -- ChunkingService then uses those blank
+            // lines to split text at paragraph boundaries instead of
+            // at an arbitrary character count.
+            PDFTextStripper pdfTextStripper = new PDFTextStripper() {
+                @Override
+                protected void writeParagraphStart() throws IOException {
+                    super.writeParagraphStart();
+                    writeString("\n");
+                }
+            };
 
             int numberOfPages = document.getNumberOfPages();
 
@@ -115,11 +133,13 @@ public class DocumentService {
 
                 // Also run OCR on any images on this page (a scanned
                 // page, a pasted screenshot, a diagram, etc.) and add
-                // whatever text is found onto the page's normal text.
+                // whatever text is found onto the page's normal text,
+                // as its own paragraph (blank line before it) so
+                // chunking doesn't merge it into the last real sentence.
                 PDPage page = document.getPage(pageNumber - 1);
                 String ocrText = extractOcrTextFromPage(page);
 
-                pageContent.setText(pageText + "\n" + ocrText);
+                pageContent.setText(pageText + "\n\n" + ocrText);
                 pageContents.add(pageContent);
 
             }

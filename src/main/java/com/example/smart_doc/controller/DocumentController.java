@@ -145,15 +145,20 @@ public class DocumentController {
             List<PageContent> pageContents =
                     documentService.processDocument(file);
 
-            // 3b. Reject PDFs with nothing to actually search --
-            // usually a scanned/image-only PDF. Without this check,
-            // it would "succeed" but store zero chunks and zero
-            // embeddings, silently.
+            // 3b. Reject PDFs with nothing to actually search. Note
+            // that pageContents here already includes OCR text from
+            // any images on the page (see DocumentService.processDocument),
+            // so a normal scanned/image-only PDF is usually fine at
+            // this point -- this only catches pages with truly nothing
+            // on them (blank pages, or images OCR couldn't read any
+            // text from). Without this check, that case would
+            // "succeed" but store zero chunks and zero embeddings,
+            // silently.
             if (!documentService.hasExtractableText(pageContents)) {
                 return new UploadResult(
                         fileName,
                         "error",
-                        "This PDF has no extractable text (it may be a scanned or image-only PDF)."
+                        "This PDF has no extractable text, even after OCR on any images it contains. It may be blank or contain images with no readable text."
                 );
             }
 

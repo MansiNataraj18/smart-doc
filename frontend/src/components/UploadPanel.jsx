@@ -2,71 +2,26 @@ import { useRef, useState } from "react";
 import { uploadDocuments, deleteDocument } from "../api";
 import ConfirmDialog from "./ConfirmDialog";
 
-// This component is the "Upload Documents" section. Its only job is
-// UI: show which files are picked, show progress, show success/error
-// messages, and show the "replace?" / "delete?" popups.
-//
-// It does a quick, friendly check on the file name/type just so the
-// user gets instant feedback instead of waiting for a round trip to
-// the server. That check is NOT the real security check -- it's easy
-// to fool (just rename any file to end in ".pdf"). The backend
-// (DocumentService.isPdfFile) always re-checks the file's actual
-// bytes before doing anything with it, so it never trusts this quick
-// frontend check alone.
-//
-// It also does NOT decide whether a file is a duplicate. That's a
-// business decision, so the backend (DocumentController) makes it.
-// This component just sends files to the backend and displays
-// whatever the backend says happened.
-//
-// "uploadedDocuments" is the persisted list (from GET /documents,
-// backed by PostgreSQL) passed down from App.jsx. After an upload or
-// delete, this component calls onDocumentsUploaded() so App.jsx
-// re-fetches the real list from the backend, instead of guessing
-// what changed.
-
 function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
-  // The files the user has picked but not uploaded yet
+  //Use a variable called selectedFiles, initially make it empty, and use setSelectedFiles to change it. Whenever it is changed using the setter, React updates the UI accordingly.
   const [selectedFiles, setSelectedFiles] = useState([]);
 
-  // True while an upload request is in flight
   const [isUploading, setIsUploading] = useState(false);
 
-  // The message shown at the bottom of the upload box, e.g.
-  // { type: "success" | "error", message: "..." }
   const [status, setStatus] = useState(null);
 
-  // Names of files the backend told us already exist. Non-empty
-  // means we show the "replace it?" popup.
   const [duplicateNames, setDuplicateNames] = useState([]);
 
-  // Progress while uploading, e.g. { completed: 2, total: 5 }
   const [uploadProgress, setUploadProgress] = useState(null);
 
-  // Name of a document the user clicked the delete (×) button on.
-  // We wait for the user to confirm before actually deleting it.
   const [documentToDelete, setDocumentToDelete] = useState(null);
 
-  // True while a delete request is in flight
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // True while the user is dragging a file over the drop area --
-  // only used to show/hide the highlighted drop-zone border.
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Lets us clear the native file input after an upload
   const fileInputRef = useRef(null);
 
-  // Shared by BOTH the "Choose Files" picker and drag-and-drop, so
-  // there's only one place that decides what happens with newly
-  // picked files, no matter how they were picked.
-  //
-  // We do a quick check here -- by file name/type -- just to give the
-  // user instant feedback instead of making them wait for an upload
-  // attempt to find out. This is ONLY a convenience: it's easy to
-  // fake (rename any file to end in ".pdf"), so the backend always
-  // does the real check on the file's actual content before storing
-  // anything.
   function addSelectedFiles(chosenFiles) {
     const pdfFiles = chosenFiles.filter(
       (file) =>
@@ -85,20 +40,13 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
 
     setSelectedFiles(pdfFiles);
 
-    // A fresh selection always needs to be re-checked by the
-    // backend -- clear any stale duplicate/confirmation state left
-    // over from a previous selection.
     setDuplicateNames([]);
   }
 
-  // Called when the user picks files with the file dialog.
   function handleFileChange(event) {
     addSelectedFiles(Array.from(event.target.files));
   }
 
-  // Called continuously while a file is being dragged over the drop
-  // area. Preventing the default behavior is what tells the browser
-  // "yes, dropping here is allowed" -- without it, onDrop never fires.
   function handleDragOver(event) {
     event.preventDefault();
 
@@ -107,15 +55,9 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     }
   }
 
-  // The drag left the drop area (or the user dropped elsewhere) --
-  // just turn off the highlighted border.
   function handleDragLeave() {
     setIsDraggingOver(false);
   }
-
-  // The user actually dropped file(s) onto the drop area. This uses
-  // the exact same addSelectedFiles() function as picking files the
-  // normal way, so dropped files go through the same PDF check.
   function handleDrop(event) {
     event.preventDefault();
     setIsDraggingOver(false);
@@ -127,8 +69,6 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     addSelectedFiles(Array.from(event.dataTransfer.files));
   }
 
-  // Clears the selected files and resets the file input, so the
-  // upload box goes back to its empty state.
   function resetSelection() {
     setSelectedFiles([]);
     setDuplicateNames([]);
@@ -138,23 +78,12 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     }
   }
 
-  // Removes one file from the pending selection before uploading.
-  // Nothing is sent to the backend here -- this only changes what's
-  // shown on screen.
   function handleRemovePendingFile(indexToRemove) {
     setSelectedFiles((previousFiles) =>
       previousFiles.filter((_, index) => index !== indexToRemove)
     );
   }
 
-  // Uploads a list of files, one at a time, and shows a progress
-  // message as each one finishes. "replace" tells the backend the
-  // user has confirmed it's OK to overwrite an existing document.
-  //
-  // For every file, the backend sends back a status: "success",
-  // "duplicate", "invalid" (not a real PDF), or "error". This
-  // function just collects those results and turns them into what
-  // the user sees -- it doesn't make any of those decisions itself.
   async function performUpload(filesToUpload, replace) {
     setIsUploading(true);
     setStatus(null);
@@ -172,7 +101,6 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
         );
         allResults.push(...resultsForThisFile);
       } catch (error) {
-        // The request itself failed (e.g. backend is down)
         allResults.push({
           fileName: filesToUpload[index].name,
           status: "error",
@@ -186,13 +114,10 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
 
     setUploadProgress(null);
 
-    // Re-fetch the persisted list from the backend now that the
-    // upload attempt is done, instead of guessing what got saved.
     if (onDocumentsUploaded) {
       await onDocumentsUploaded();
     }
 
-    // Sort the backend's results into the three things we show on screen
     const duplicates = allResults.filter((result) => result.status === "duplicate");
     const failures = allResults.filter(
       (result) => result.status === "invalid" || result.status === "error"
@@ -200,7 +125,6 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     const successes = allResults.filter((result) => result.status === "success");
 
     if (duplicates.length > 0) {
-      // Ask the user whether to replace these specific files
       setDuplicateNames(duplicates.map((result) => result.fileName));
     } else {
       resetSelection();
@@ -225,7 +149,6 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     setIsUploading(false);
   }
 
-  // Called when the user clicks the "Upload" button.
   function handleUploadClick() {
     if (selectedFiles.length === 0) {
       setStatus({
@@ -238,15 +161,11 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     performUpload(selectedFiles, false);
   }
 
-  // "Cancel" on the replace popup -- don't replace anything, just
-  // close the popup and clear the pending selection.
   function handleCancelReplace() {
     setDuplicateNames([]);
     resetSelection();
   }
 
-  // "Replace" on the replace popup -- re-upload just the file(s) the
-  // backend flagged as duplicates, this time with replace=true.
   function handleConfirmReplace() {
     const filesToReplace = selectedFiles.filter((file) =>
       duplicateNames.includes(file.name)
@@ -256,20 +175,14 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     performUpload(filesToReplace, true);
   }
 
-  // Clicking the × next to an already-uploaded document just asks
-  // for confirmation first -- nothing is deleted yet.
   function handleDeleteClick(documentName) {
     setDocumentToDelete(documentName);
   }
 
-  // "No" -- close the confirmation, nothing is deleted.
   function handleCancelDelete() {
     setDocumentToDelete(null);
   }
 
-  // "Yes" -- actually delete the document. The backend removes it
-  // from both Qdrant and PostgreSQL. Only refresh the list if the
-  // delete actually succeeded.
   async function handleConfirmDelete() {
     const nameToDelete = documentToDelete;
     setIsDeleting(true);
@@ -309,23 +222,12 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
     <div className="documents-content">
       <section className="upload-panel">
         <h2 className="upload-title">Upload Documents</h2>
-
-        {/* Informational only -- OCR (reading text out of images/scans)
-            now runs on the backend for every uploaded PDF, but it can't
-            truly understand a diagram's structure, just the words in it.
-            This is just a heads-up for the user; it doesn't change
-            anything about how uploading works. */}
         <p className="upload-ocr-warning">
           Warning: If your PDF contains images such as flowcharts or
           diagrams, OCR may not accurately understand the image
           structure or relationships. Results may be inaccurate.
         </p>
 
-        {/* Drag-and-drop area. Dropping files here calls the exact
-            same addSelectedFiles() function as the "Choose Files"
-            button, so both ways of picking a file behave identically.
-            The border just highlights while something is being
-            dragged over it -- it has no effect on what gets uploaded. */}
         <div
           className={`upload-dropzone${
             isDraggingOver ? " upload-dropzone-active" : ""
@@ -339,17 +241,6 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
           </p>
 
           <div className="upload-controls">
-            {/* The native <input type="file"> shows its OWN chosen-file
-                text right next to the button (that's browser chrome,
-                not something we render) -- and there's no way to make
-                it forget just one file when a single pending file is
-                removed below. So instead of showing the raw input, we
-                hide it and trigger it from our own "Choose Files"
-                label. The list below (driven entirely by our
-                "selectedFiles" state) becomes the ONE place selected
-                files are shown, so there's no duplicate text and
-                removing a file there is the only place removing it
-                needs to happen. */}
             <label
               htmlFor="pdf-upload-input"
               className={`upload-choose-button${
@@ -368,6 +259,7 @@ function UploadPanel({ uploadedDocuments, onDocumentsUploaded }) {
               id="pdf-upload-input"
               ref={fileInputRef}
               type="file"
+              //show or prefer pdf files only in the file chooser dialog. This is done by setting the accept attribute to ".pdf,application/pdf". The multiple attribute allows users to select multiple files at once.
               accept=".pdf,application/pdf"
               multiple
               onChange={handleFileChange}
